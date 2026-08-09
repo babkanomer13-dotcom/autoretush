@@ -79,6 +79,20 @@ def test_embedded_raster_data_uri_is_rejected(mime: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "payload",
+    [
+        "image/png;charset=utf-8;base64,AAAA",
+        "image/svg+xml;base64,PHN2Zz4=",
+        "image/png,iVBORw0KGgo",
+    ],
+)
+def test_any_image_data_uri_variant_is_rejected(payload: str) -> None:
+    content = ("const preview = 'data:" + payload + "';").encode()
+
+    assert "embedded raster image data URI" in SAFETY.content_reasons(content)
+
+
+@pytest.mark.parametrize(
     ("drive_path", "source_path"),
     [
         ("E:" + "/archive", "tests/test_config.py"),

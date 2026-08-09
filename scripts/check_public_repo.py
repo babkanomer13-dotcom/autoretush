@@ -185,7 +185,7 @@ _WINDOWS_ABSOLUTE_PATH = re.compile(
     r"(?<![A-Za-z0-9_])(?P<path>[A-Za-z]:[\\/](?![\\/])[^\s\"'<>]*)"
 )
 _RASTER_DATA_URI = re.compile(
-    r"data:image/(?:avif|bmp|gif|heic|heif|jpeg|jpg|png|tiff|webp);base64,",
+    r"data:image/[a-z0-9.+-]+(?:;[^,\s]*)?,",
     re.IGNORECASE,
 )
 _UNIX_ABSOLUTE_PATH = re.compile(r"(?<![:A-Za-z0-9_.-])(?P<path>/(?:[^/\s\"'<>]+/)+[^\s\"'<>]*)")
