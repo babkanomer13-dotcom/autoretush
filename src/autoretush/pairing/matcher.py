@@ -18,6 +18,10 @@ from autoretush.pairing.geometry import (
 )
 
 
+class PairingInputError(RuntimeError):
+    """A group contains unreadable inputs; paths are deliberately omitted."""
+
+
 @dataclass(frozen=True)
 class PairCandidate:
     pair_id: str
@@ -84,15 +88,31 @@ def _prepared(
 def match_group(group: PairGroup, config: PairingConfig) -> list[PairCandidate]:
     before_paths = [item.path for item in group.before]
     after_paths = [item.path for item in group.after]
-    before_fp, _ = _fingerprints(before_paths)
-    after_fp, _ = _fingerprints(after_paths)
+    before_fp, before_fingerprint_errors = _fingerprints(before_paths)
+    after_fp, after_fingerprint_errors = _fingerprints(after_paths)
+    if before_fingerprint_errors or after_fingerprint_errors:
+        raise PairingInputError(
+            "Fingerprinting failed for "
+            f"{len(before_fingerprint_errors)} before and "
+            f"{len(after_fingerprint_errors)} after images"
+        )
     usable_before = [path for path in before_paths if path in before_fp]
     usable_after = [path for path in after_paths if path in after_fp]
     if not usable_before or not usable_after:
         return []
 
-    prepared_before, _ = _prepared(usable_before, max_long_side=config.max_long_side)
-    prepared_after, _ = _prepared(usable_after, max_long_side=config.max_long_side)
+    prepared_before, before_prepare_errors = _prepared(
+        usable_before, max_long_side=config.max_long_side
+    )
+    prepared_after, after_prepare_errors = _prepared(
+        usable_after, max_long_side=config.max_long_side
+    )
+    if before_prepare_errors or after_prepare_errors:
+        raise PairingInputError(
+            "Geometry preparation failed for "
+            f"{len(before_prepare_errors)} before and "
+            f"{len(after_prepare_errors)} after images"
+        )
     usable_before = [path for path in usable_before if path in prepared_before]
     usable_after = [path for path in usable_after if path in prepared_after]
     if not usable_before or not usable_after:

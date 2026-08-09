@@ -4,7 +4,7 @@
 
 | Компонент | Кандидат | Назначение | Статус |
 |---|---|---|---|
-| Face landmarks | [MediaPipe Face Landmarker](https://ai.google.dev/edge/api/mediapipe/python/mp/tasks/vision/FaceLandmarker) | геометрия текущего лица и маски зон | основной кандидат; проверить условия model asset |
+| Face landmarks | [MediaPipe Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/python) | геометрия текущего лица и маски зон | локальный prototype проверен; asset не распространять, условия ещё подтвердить |
 | Vision runtime | [MediaPipe](https://github.com/google-ai-edge/mediapipe) | локальный inference | Apache-2.0 для кода |
 | Mask refinement | [SAM 2](https://github.com/facebookresearch/sam2) | сложные границы по prompts | опционально; Apache-2.0 repo, проверить checkpoint |
 | Global enhancement | [Image-Adaptive 3D LUT](https://github.com/HuiZeng/Image-Adaptive-3DLUT) | архитектурный baseline | Apache-2.0; свой train с нуля |
@@ -27,3 +27,8 @@
 ## Правило принятия
 
 Для каждого компонента фиксируются: URL и commit/tag, лицензия кода, лицензия весов, лицензия исходного датасета, разрешённое применение, SHA-256 загруженного файла и дата проверки. Если хотя бы один пункт неизвестен, компонент остаётся экспериментальным и не входит в рабочую сборку.
+
+Текущий локальный prototype использует официальный float16 bundle `FaceLandmarker` из
+раздела Models документации Google. Проверенный SHA-256 на 2026-08-09:
+`64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`.
+Файл хранится только в приватной model-зоне и не входит в репозиторий или релиз.

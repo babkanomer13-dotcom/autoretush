@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import uuid
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
@@ -46,8 +47,25 @@ def is_image(path: Path) -> bool:
     return path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
 
 
-def _images(directory: Path, *, recursive: bool) -> tuple[ImageRecord, ...]:
-    iterator: Iterable[Path] = directory.rglob("*") if recursive else directory.iterdir()
+def _images(
+    directory: Path,
+    *,
+    recursive: bool,
+    excluded_dir_names: Iterable[str] = (),
+) -> tuple[ImageRecord, ...]:
+    if recursive:
+        excluded = {name.casefold() for name in excluded_dir_names}
+        discovered: list[Path] = []
+        for current, dir_names, file_names in os.walk(directory, followlinks=False):
+            dir_names[:] = sorted(
+                (name for name in dir_names if name.casefold() not in excluded),
+                key=str.casefold,
+            )
+            current_path = Path(current)
+            discovered.extend(current_path / name for name in sorted(file_names, key=str.casefold))
+        iterator: Iterable[Path] = discovered
+    else:
+        iterator = directory.iterdir()
     records: list[ImageRecord] = []
     for path in iterator:
         try:
@@ -90,6 +108,7 @@ def discover_groups(config: AppConfig) -> Iterator[PairGroup]:
             before = _images(
                 source_dir,
                 recursive=not config.inventory.source_images_direct_only,
+                excluded_dir_names=config.processed_folder_names,
             )
             after = _images(
                 current_path,
@@ -153,9 +172,19 @@ def build_inventory(config: AppConfig) -> dict[str, object]:
 
 def write_inventory(report: dict[str, object], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    if os.path.lexists(path):
+        raise FileExistsError(f"Refusing to overwrite inventory report: {path}")
+    temporary = path.with_name(f".{path.name}.partial-{uuid.uuid4().hex[:12]}")
+    try:
+        encoded = (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        with temporary.open("xb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary, path)
+    finally:
+        if os.path.lexists(temporary):
+            temporary.unlink()
 
 
 def group_summary(group: PairGroup) -> dict[str, object]:

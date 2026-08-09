@@ -11,6 +11,10 @@ from autoretush.pairing.fingerprint import read_bgr, resize_long_side
 
 @dataclass(frozen=True)
 class GeometryMetrics:
+    prepared_before_height: int = 0
+    prepared_before_width: int = 0
+    prepared_after_height: int = 0
+    prepared_after_width: int = 0
     keypoints_before: int = 0
     keypoints_after: int = 0
     good_matches: int = 0
@@ -110,6 +114,10 @@ def compare_prepared(source: PreparedFrame, target: PreparedFrame) -> GeometryMe
     source_descriptors = source.descriptors
     target_descriptors = target.descriptors
     base = {
+        "prepared_before_height": int(source_gray.shape[0]),
+        "prepared_before_width": int(source_gray.shape[1]),
+        "prepared_after_height": int(target_gray.shape[0]),
+        "prepared_after_width": int(target_gray.shape[1]),
         "keypoints_before": len(source_keypoints),
         "keypoints_after": len(target_keypoints),
     }

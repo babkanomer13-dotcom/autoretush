@@ -2,11 +2,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 from autoretush.config import PairingConfig
 from autoretush.inventory import ImageRecord, PairGroup
 from autoretush.pairing.geometry import compare_geometry
-from autoretush.pairing.matcher import match_group
+from autoretush.pairing.matcher import PairingInputError, match_group
 
 
 def _scene(seed: int = 7) -> np.ndarray:
@@ -98,3 +99,28 @@ def test_group_assignment_matches_two_retouched_frames(tmp_path: Path) -> None:
 
     assert mapping == {"a.jpg": "unrelated-name-2.jpg", "b.jpg": "unrelated-name-1.jpg"}
     assert {item.decision for item in results} == {"accepted"}
+
+
+def test_group_with_unreadable_image_fails_closed_without_path_in_error(tmp_path: Path) -> None:
+    source_dir = tmp_path / "private-name"
+    processed_dir = source_dir / "pp"
+    before = source_dir / "secret-before.jpg"
+    after = processed_dir / "secret-after.jpg"
+    before.parent.mkdir(parents=True)
+    after.parent.mkdir(parents=True)
+    before.write_bytes(b"not-an-image")
+    _write(after, _scene(90))
+    group = PairGroup(
+        group_id="g_test",
+        archive_root=tmp_path,
+        source_dir=source_dir,
+        processed_dir=processed_dir,
+        before=(_record(before),),
+        after=(_record(after),),
+    )
+
+    with pytest.raises(PairingInputError) as captured:
+        match_group(group, PairingConfig())
+
+    assert "secret-before" not in str(captured.value)
+    assert "1 before" in str(captured.value)

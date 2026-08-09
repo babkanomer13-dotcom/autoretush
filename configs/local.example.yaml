@@ -1,0 +1,32 @@
+# Copy this file to configs/local.yaml and keep real paths only in that ignored copy.
+archive_roots:
+  - "X:/private-archive/season-a"
+
+processed_folder_names:
+  - "pp"
+
+workspace: "X:/autoretush-local"
+
+inventory:
+  source_images_direct_only: true
+  processed_images_recursive: true
+
+selection:
+  include_path_keywords: []
+  exclude_path_keywords: []
+
+pairing:
+  shortlist_size: 8
+  max_long_side: 1200
+  min_keypoint_inliers: 30
+  min_inlier_ratio: 0.60
+  min_source_coverage: 0.08
+  max_phash_distance: 28
+  auto_accept_score: 0.78
+  review_score: 0.62
+
+materialize:
+  mode: copy
+  destination: "X:/autoretush-local/dataset"
+  min_overlap_ratio: 0.50
+  min_edge_correlation: 0.15

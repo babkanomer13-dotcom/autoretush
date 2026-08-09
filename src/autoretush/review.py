@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import random
 from collections import defaultdict, deque
 from collections.abc import Iterable
 from pathlib import Path
 
 from PIL import Image, ImageOps
+
+from autoretush.identifiers import validate_pair_id
 
 
 def _round_robin_groups(records: list[dict[str, object]], *, seed: int) -> list[dict[str, object]]:
@@ -107,18 +110,43 @@ def build_review_pack(
     *,
     thumbnail_size: int = 900,
     image_format: str = "webp",
+    private_manifest_path: Path | None = None,
 ) -> Path:
     image_format = image_format.casefold()
     if image_format not in {"webp", "jpeg"}:
         raise ValueError("image_format must be 'webp' or 'jpeg'")
+    pair_ids: list[str] = []
+    seen_pair_ids: set[str] = set()
+    for record in records:
+        pair_id = validate_pair_id(record.get("pair_id"))
+        if pair_id in seen_pair_ids:
+            raise ValueError(f"Duplicate pair_id in review pack: {pair_id}")
+        seen_pair_ids.add(pair_id)
+        pair_ids.append(pair_id)
+    if private_manifest_path is not None:
+        resolved_output = output_dir.resolve(strict=False)
+        resolved_manifest = private_manifest_path.resolve(strict=False)
+        try:
+            resolved_manifest.relative_to(resolved_output)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("Private manifest must be outside the publishable review directory")
+        if os.path.lexists(private_manifest_path):
+            raise FileExistsError(f"Private manifest already exists: {private_manifest_path}")
+    if os.path.lexists(output_dir):
+        if output_dir.is_symlink() or not output_dir.is_dir():
+            raise ValueError("Review output must be a real directory")
+        if any(output_dir.iterdir()):
+            raise ValueError("Review output directory must be empty")
+    else:
+        output_dir.mkdir(parents=True)
     image_extension = "webp" if image_format == "webp" else "jpg"
-    output_dir.mkdir(parents=True, exist_ok=True)
     assets = output_dir / "assets"
     cards: list[str] = []
     private_manifest: list[dict[str, object]] = []
 
-    for index, record in enumerate(records, start=1):
-        pair_id = str(record["pair_id"])
+    for index, (record, pair_id) in enumerate(zip(records, pair_ids, strict=True), start=1):
         before = Path(str(record["before_path"]))
         after = Path(str(record["after_path"]))
         _thumbnail(
@@ -136,9 +164,10 @@ def build_review_pack(
         cards.append(_card(record, index=index, image_extension=image_extension))
         private_manifest.append(record)
 
-    (output_dir / "sample_manifest.json").write_text(
-        json.dumps(private_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    if private_manifest_path is not None:
+        private_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        with private_manifest_path.open("x", encoding="utf-8", newline="\n") as handle:
+            json.dump(private_manifest, handle, ensure_ascii=False, indent=2)
     page = f"""<!doctype html>
 <html lang="ru">
 <head>

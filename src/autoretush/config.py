@@ -39,6 +39,8 @@ class SelectionConfig:
 class MaterializeConfig:
     mode: str
     destination: Path
+    min_overlap_ratio: float = 0.50
+    min_edge_correlation: float = 0.15
 
 
 @dataclass(frozen=True)
@@ -67,25 +69,26 @@ def _path(value: Any, field: str) -> Path:
 
 
 def _bounded_float(value: Any, field: str, *, low: float, high: float) -> float:
-    try:
-        result = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ConfigError(f"{field} must be numeric") from exc
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"{field} must be numeric")
+    result = float(value)
     if not low <= result <= high:
         raise ConfigError(f"{field} must be between {low} and {high}")
     return result
 
 
 def _positive_int(value: Any, field: str) -> int:
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{field} must be an integer")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as exc:
-        raise ConfigError(f"{field} must be an integer") from exc
-    if result <= 0:
+    if value <= 0:
         raise ConfigError(f"{field} must be positive")
-    return result
+    return value
+
+
+def _boolean(value: Any, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigError(f"{field} must be a boolean")
+    return value
 
 
 def load_config(path: Path) -> AppConfig:
@@ -114,8 +117,14 @@ def load_config(path: Path) -> AppConfig:
 
     inv = _mapping(root.get("inventory"), "inventory")
     inventory = InventoryConfig(
-        source_images_direct_only=bool(inv.get("source_images_direct_only", True)),
-        processed_images_recursive=bool(inv.get("processed_images_recursive", True)),
+        source_images_direct_only=_boolean(
+            inv.get("source_images_direct_only", True),
+            "inventory.source_images_direct_only",
+        ),
+        processed_images_recursive=_boolean(
+            inv.get("processed_images_recursive", True),
+            "inventory.processed_images_recursive",
+        ),
     )
 
     selection_raw = _mapping(root.get("selection"), "selection")
@@ -174,6 +183,18 @@ def load_config(path: Path) -> AppConfig:
         mode=str(mat.get("mode", "copy")).casefold(),
         destination=_path(
             mat.get("destination", str(workspace / "dataset")), "materialize.destination"
+        ),
+        min_overlap_ratio=_bounded_float(
+            mat.get("min_overlap_ratio", 0.50),
+            "materialize.min_overlap_ratio",
+            low=0.0,
+            high=1.0,
+        ),
+        min_edge_correlation=_bounded_float(
+            mat.get("min_edge_correlation", 0.15),
+            "materialize.min_edge_correlation",
+            low=-1.0,
+            high=1.0,
         ),
     )
     if materialize.mode != "copy":
